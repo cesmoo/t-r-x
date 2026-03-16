@@ -413,7 +413,7 @@ class EnterpriseController:
             
             while True:
                 try:
-                    payload = {'pageSize': 5, 'pageNo': 1, 'typeId': 30, 'language': 7, 'timestamp': int(time.time())}
+                    payload = {'pageSize': 5, 'pageNo': 1, 'typeId': 30, 'language': 7, 'random': '9ef85244056948ba8dcae7aee7758bf4', 'signature': '2EDB8C2B5264F62EC53116916A9EC05C', 'timestamp': int(time.time())}
                     async with session.post(Config.API_URL, headers=Config.get_headers(), json=payload) as r:
                         if r.status == 200:
                             data = await r.json()
