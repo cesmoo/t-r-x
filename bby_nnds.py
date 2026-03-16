@@ -48,6 +48,9 @@ class Config:
     BOT_TOKEN: str = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN")
     CHANNEL_ID: str = os.getenv("CHANNEL_ID", "YOUR_CHANNEL_ID")
     MONGO_URI: str = os.getenv("MONGO_URI", "YOUR_MONGO_URI")
+
+    WIN_STICKER = "CAACAgUAAxkBAAEQwtVpt1_oWxyaQFmiy3O_1knZjN9yCwAC2hIAAikFkVX0qhu40v6REDoE"  
+    LOSE_STICKER = "" 
     
     MULTIPLIERS: List[int] = [1, 2, 3, 5, 8, 15, 30, 50, 100]
     API_URL: str = 'https://6lotteryapi.com/api/webapi/GetNoaverageEmerdList'
@@ -330,6 +333,13 @@ class UltraMasterEngine:
 # =========================================================================
 # 💰 MODULE 6: TELEGRAM UI & PRESENTATION
 # =========================================================================
+def get_color_emoji(color: str) -> str:
+    if color == 'RED': return "🔴"
+    if color == 'GREEN': return "🟢"
+    if color == 'RED_VIOLET': return "🔴🟣"
+    if color == 'GREEN_VIOLET': return "🟢🟣"
+    return "⚪"
+
 class UIManager:
     def __init__(self, bot_client: Bot):
         self.bot = bot_client
@@ -343,11 +353,13 @@ class UIManager:
             f"📊 Confidence: {conf}%\n"
             f"🧠 Top Engine: <code>{top_engine.upper()}</code>"
         )
-        try: await self.bot.send_message(chat_id=Config.CHANNEL_ID, text=msg)
-        except: pass
+        try: 
+            await self.bot.send_message(chat_id=Config.CHANNEL_ID, text=msg)
+        except Exception as e: 
+            logger.error(f"Prediction Send Error: {e}")
 
     async def broadcast_result(self, issue: str, pred: str, step: int, is_win: bool, actual_color: str, actual_num: int) -> None:
-        win_str = "WIN" if is_win else "LOSE"
+        win_str = "WIN ✅" if is_win else "LOSE ❌"
         res_emoji = get_color_emoji(actual_color)
         
         msg = (
@@ -356,8 +368,19 @@ class UIManager:
             f"🎯 Choice: {get_color_emoji(pred)} {pred} {step}x\n"
             f"📊 Result: {res_emoji} <b>{win_str}</b> | ({actual_num})"
         )
-        try: await self.bot.send_message(chat_id=Config.CHANNEL_ID, text=msg)
-        except: pass
+        
+        try: 
+            # 1. Result စာသားကို အရင်ပို့မည်
+            await self.bot.send_message(chat_id=Config.CHANNEL_ID, text=msg)
+            
+            # 2. 💡 [FIXED] အနိုင်/အရှုံး Sticker ပို့မည့် စနစ် ပြန်ထည့်ထားပါသည်
+            if is_win and Config.WIN_STICKER:
+                await self.bot.send_sticker(chat_id=Config.CHANNEL_ID, sticker=Config.WIN_STICKER)
+            elif not is_win and Config.LOSE_STICKER:
+                await self.bot.send_sticker(chat_id=Config.CHANNEL_ID, sticker=Config.LOSE_STICKER)
+                
+        except Exception as e: 
+            logger.error(f"Result/Sticker Send Error: {e}")
 
 # =========================================================================
 # 🚀 MODULE 7: THE MAIN CONTROLLER LOOP
