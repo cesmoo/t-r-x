@@ -31,7 +31,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger("ProPredictor")
+logger = logging.getLogger("ProPredictor-TRX")
 
 class Config:
     BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -43,11 +43,12 @@ class Config:
     
     MULTIPLIERS = [1, 2, 3, 5, 8, 15, 30, 50]
     
+    # 💡 [TRX] API လမ်းကြောင်း ပြောင်းလဲထားပါသည်
     API_URL = 'https://6lotteryapi.com/api/webapi/GetTRXNoaverageEmerdList'
     HEADERS = {
         'authority': '6lotteryapi.com', 'accept': 'application/json, text/plain, */*',
         'content-type': 'application/json;charset=UTF-8', 'origin': 'https://www.6win566.com',
-        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        'user-agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36'
     }
 
 bot = Bot(token=Config.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
@@ -57,10 +58,10 @@ dp = Dispatcher()
 # 🗄️ MODULE 2: DATABASE MANAGER
 # ==========================================
 class DatabaseManager:
-    """ MongoDB စီမံခန့်ခွဲရေး """
     def __init__(self, uri: str):
         self.client = motor.motor_asyncio.AsyncIOMotorClient(uri, serverSelectionTimeoutMS=5000)
-        self.db = self.client['trx-sixlottery_professional']
+        # 💡 [TRX] ရိုးရိုး WinGo နှင့် Data မရောစေရန် Database အမည် ပြောင်းထားသည်
+        self.db = self.client['sixlottery_trx_professional']
         self.history = self.db['game_history']
         self.predictions = self.db['predictions']
 
@@ -68,7 +69,7 @@ class DatabaseManager:
         try:
             await self.history.create_index("issue_number", unique=True)
             await self.predictions.create_index("issue_number", unique=True)
-            logger.info("✅ Database Initialized Successfully.")
+            logger.info("✅ TRX Database Initialized Successfully.")
         except Exception as e:
             logger.error(f"❌ Database Error: {e}")
 
@@ -102,7 +103,6 @@ class DatabaseManager:
 # 🔬 MODULE 3: FEATURE ENGINEERING
 # ==========================================
 class FeatureEngineer:
-    """ Raw Data များကို Machine Learning နားလည်သော သင်္ချာကိန်းဂဏန်းများအဖြစ် ပြောင်းလဲပေးခြင်း """
     def __init__(self, window_size=5):
         self.window = window_size
         self.scaler = StandardScaler()
@@ -122,7 +122,6 @@ class FeatureEngineer:
             X.append(row)
             y.append(1 if sizes[i+self.window] == 'BIG' else 0)
             
-        # လက်ရှိခန့်မှန်းရမည့် အခြေအနေ (Current Features)
         curr_feats = []
         for j in range(1, self.window + 1): 
             size_val = 1 if sizes[-j] == 'BIG' else 0
@@ -141,7 +140,6 @@ class FeatureEngineer:
 class PatternEngine:
     @staticmethod
     def predict(sizes: list, n: int = 3) -> float:
-        """ N-Gram Sequence မှတဆင့် နောက်ထွက်မည့် ရာခိုင်နှုန်းကို ရှာဖွေခြင်း """
         if len(sizes) < n + 1: return 0.5
         current_pattern = tuple(sizes[-n:])
         matches = {'BIG': 0, 'SMALL': 0}
@@ -155,7 +153,6 @@ class PatternEngine:
 class MarkovChain:
     @staticmethod
     def predict(sizes: list) -> float:
-        """ လက်ရှိ State မှ နောက် State သို့ ကူးပြောင်းမည့် ရာခိုင်နှုန်းကို သင်္ချာနည်းဖြင့် တွက်ခြင်း """
         if len(sizes) < 2: return 0.5
         transitions = {'BIG': {'BIG': 0, 'SMALL': 0}, 'SMALL': {'BIG': 0, 'SMALL': 0}}
         for i in range(len(sizes)-1): 
@@ -166,7 +163,6 @@ class MarkovChain:
         return transitions[curr]['BIG'] / tot
 
 class MachineLearningCore:
-    """ ML Model ၄ မျိုးစလုံးကို တစ်ပြိုင်နက်တည်း အလုပ်လုပ်စေမည့် Class """
     def __init__(self):
         self.rf = RandomForestClassifier(n_estimators=100, max_depth=6, random_state=42, n_jobs=-1)
         self.gb = GradientBoostingClassifier(n_estimators=100, learning_rate=0.05, max_depth=3, random_state=42)
@@ -176,28 +172,24 @@ class MachineLearningCore:
     def train_and_predict(self, X, y, curr_X) -> dict:
         results = {'rf': 0.5, 'gb': 0.5, 'xgb': 0.5, 'lr': 0.5}
         try:
-            # Random Forest
             self.rf.fit(X, y)
             if 1 in self.rf.classes_:
                 results['rf'] = self.rf.predict_proba(curr_X)[0][list(self.rf.classes_).index(1)]
                 
-            # Gradient Boosting
             self.gb.fit(X, y)
             if 1 in self.gb.classes_:
                 results['gb'] = self.gb.predict_proba(curr_X)[0][list(self.gb.classes_).index(1)]
                 
-            # XGBoost
             self.xgb.fit(np.array(X), np.array(y))
             if 1 in self.xgb.classes_:
                 results['xgb'] = self.xgb.predict_proba(curr_X)[0][list(self.xgb.classes_).index(1)]
                 
-            # Logistic Regression
             self.lr.fit(X, y)
             if 1 in self.lr.classes_:
                 results['lr'] = self.lr.predict_proba(curr_X)[0][list(self.lr.classes_).index(1)]
                 
         except Exception as e:
-            logger.warning(f"ML Core Error: {e}")
+            pass
             
         return results
 
@@ -205,9 +197,7 @@ class MachineLearningCore:
 # ⚙️ MODULE 5: META OPTIMIZER & ENSEMBLE
 # ==========================================
 class MetaOptimizer:
-    """ အခြေအနေပေါ်မူတည်၍ Algorithm ၆ မျိုး၏ အလေးချိန် (Weights) ကို အလိုအလျောက် ပြင်ဆင်ခြင်း """
     def __init__(self):
-        # ကနဦး အလေးချိန်များ
         self.weights = {
             'rf': 0.20, 'gb': 0.20, 'xgb': 0.20, 
             'lr': 0.10, 'markov': 0.15, 'pattern': 0.15
@@ -220,10 +210,7 @@ class MetaOptimizer:
         actual_val = 1.0 if actual == 'BIG' else 0.0
         
         for model, prob_big in past_model_preds.items():
-            # Error ကို တွက်ချက်ခြင်း (0.0 to 1.0)
             error = abs(actual_val - prob_big)
-            
-            # အမှားနည်းလျှင် အမှတ်တိုးမည်၊ အမှားများလျှင် အမှတ်လျှော့မည်
             if error < 0.5:
                 self.weights[model] += 0.05
             else:
@@ -231,7 +218,6 @@ class MetaOptimizer:
                 
             total_w += self.weights[model]
             
-        # Normalize Back to 1.0
         if total_w > 0:
             for k in self.weights:
                 self.weights[k] /= total_w
@@ -251,25 +237,21 @@ class UltimateAIEngine:
         numbers = [int(d.get('number', 0)) for d in reversed(docs)]
         parities = [d.get('parity', 'EVEN') for d in reversed(docs)]
         
-        # 1. Statistical Models
         prob_b_pat = PatternEngine.predict(sizes, n=3)
         prob_b_mar = MarkovChain.predict(sizes)
         
-        # 2. Machine Learning Models
         X, y, curr_X = self.fe.prepare_data(sizes, numbers, parities)
         if X is not None:
             ml_probs = self.ml_core.train_and_predict(X, y, curr_X)
         else:
             ml_probs = {'rf': 0.5, 'gb': 0.5, 'xgb': 0.5, 'lr': 0.5}
             
-        # Save exact probabilities for the Optimizer to learn later
         self.last_model_probs = {
             'pattern': prob_b_pat, 'markov': prob_b_mar,
             'rf': ml_probs['rf'], 'gb': ml_probs['gb'], 
             'xgb': ml_probs['xgb'], 'lr': ml_probs['lr']
         }
         
-        # 3. Apply Meta-Optimizer Weights
         w = self.optimizer.weights
         final_b_score = (
             (self.last_model_probs['pattern'] * w['pattern']) +
@@ -282,7 +264,6 @@ class UltimateAIEngine:
         
         final_pred = "BIG" if final_b_score > 0.5 else "SMALL"
         
-        # Confidence Scaling (50.0 to 99.0)
         raw_conf = final_b_score if final_b_score > 0.5 else (1.0 - final_b_score)
         confidence = min(max(raw_conf * 100, 51.0), 99.0)
         
@@ -297,7 +278,7 @@ class TelegramUI:
 
     async def send_prediction(self, issue: str, pred: str, step: int, conf: float, top_model: str):
         msg = (
-            f"<b>[PRO PREDICTOR V6]</b>\n"
+            f"<b>[TRX PRO PREDICTOR V6]</b>\n"
             f"⏰ Period: {issue}\n"
             f"🎯 Prediction: {pred} {step}x\n"
             f"📊 Confidence: {conf}%\n"
@@ -312,7 +293,7 @@ class TelegramUI:
         res_letter = "B" if actual_size == "BIG" else "S"
         
         msg = (
-            f"☘️ <b>TRX-PROFESSIONAL</b> ☘️\n\n"
+            f"<b>SIX-LOTTERY (TRX)</b>\n\n"
             f"⏰ Period: {issue}\n"
             f"🎯 Choice: {pred} {step}x\n"
             f"📊 Result: {icon} {win_str} | {res_letter} ({actual_num})"
@@ -339,6 +320,7 @@ class GameController:
         self.lose_streak = 0
 
     async def fetch_lottery_data(self, session: aiohttp.ClientSession) -> dict:
+        # 💡 [TRX] typeId 13 နှင့် Random, Signature အသစ်များ ထည့်သွင်းထားပါသည်
         json_data = {
             'pageSize': 10, 'pageNo': 1, 'typeId': 13, 'language': 7, 
             'random': '34e141e8512d411094dc208899ed0928', 
@@ -356,7 +338,7 @@ class GameController:
         await self.db.initialize()
         
         async with aiohttp.ClientSession() as session:
-            logger.info("🔥 PRO Game Loop Started...")
+            logger.info("🔥 TRX PRO Game Loop Started...")
             while True:
                 try:
                     data = await self.fetch_lottery_data(session)
@@ -371,7 +353,6 @@ class GameController:
                     size = "BIG" if number >= 5 else "SMALL"
                     parity = "EVEN" if number % 2 == 0 else "ODD"
                     
-                    # 1. Initial Start
                     if not self.last_issue:
                         self.last_issue = issue
                         recent_preds = await self.db.get_recent_predictions(10)
@@ -392,11 +373,9 @@ class GameController:
                         await self.ui.send_prediction(next_issue, pred, current_step, conf, top_model)
                         await asyncio.sleep(1.0); continue
 
-                    # 2. New Issue Detected
                     if int(issue) > int(self.last_issue):
                         await self.db.save_history(issue, number, size, parity)
                         
-                        # Self Learning Update
                         self.ai.optimizer.learn_from_result(size, self.ai.last_model_probs)
                         
                         pred_doc = await self.db.predictions.find_one({"issue_number": issue})
@@ -418,7 +397,6 @@ class GameController:
 
                         self.last_issue = issue
                         
-                        # 3. Next Prediction
                         next_issue = str(int(issue) + 1)
                         docs = await self.db.get_history(500)
                         
@@ -438,7 +416,7 @@ class GameController:
 # 🚀 ENTRY POINT
 # ==========================================
 async def main():
-    logger.info("Initializing 6-CORE PROFESSIONAL PREDICTOR...")
+    logger.info("Initializing 6-CORE TRX PROFESSIONAL PREDICTOR...")
     await bot.delete_webhook(drop_pending_updates=True)
     
     controller = GameController()
