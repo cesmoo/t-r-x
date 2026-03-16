@@ -46,8 +46,11 @@ class Config:
     # 💡 [TRX] API လမ်းကြောင်း ပြောင်းလဲထားပါသည်
     API_URL = 'https://6lotteryapi.com/api/webapi/GetTRXNoaverageEmerdList'
     HEADERS = {
-        'authority': '6lotteryapi.com', 'accept': 'application/json, text/plain, */*',
-        'content-type': 'application/json;charset=UTF-8', 'origin': 'https://www.6win566.com',
+        'authority': '6lotteryapi.com', 
+        'accept': 'application/json, text/plain, */*',
+        'authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOiIxNzczNjI1OTM5IiwibmJmIjoiMTc3MzYyNTkzOSIsImV4cCI6IjE3NzM2Mjc3MzkiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL2V4cGlyYXRpb24iOiIzLzE2LzIwMjYgODo1MjoxOSBBTSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IkFjY2Vzc19Ub2tlbiIsIlVzZXJJZCI6IjEwNzY1OTQiLCJVc2VyTmFtZSI6Ijk1OTY3NTMyMzg3OCIsIlVzZXJQaG90byI6IjciLCJOaWNrTmFtZSI6IuGAleGAvOGAiuGAt-GAuuGAheGAr-GAtiIsIkFtb3VudCI6Ijk1LjU1IiwiSW50ZWdyYWwiOiIwIiwiTG9naW5NYXJrIjoiSDUiLCJMb2dpblRpbWUiOiIzLzE2LzIwMjYgODoyMjoxOSBBTSIsIkxvZ2luSVBBZGRyZXNzIjoiMTAzLjEzNC4yMDcuMTUyIiwiRGJOdW1iZXIiOiIwIiwiSXN2YWxpZGF0b3IiOiIwIiwiS2V5Q29kZSI6IjEwNCIsIlRva2VuVHlwZSI6IkFjY2Vzc19Ub2tlbiIsIlBob25lVHlwZSI6IjEiLCJVc2VyVHlwZSI6IjAiLCJVc2VyTmFtZTIiOiIiLCJpc3MiOiJqd3RJc3N1ZXIiLCJhdWQiOiJsb3R0ZXJ5VGlja2V0In0.8cPFnuY7n2m0h2T0XZ2ONlEWvVSCvCI14FQNgxUbJes',
+        'content-type': 'application/json;charset=UTF-8', 
+        'origin': 'https://www.6win566.com',
         'user-agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36'
     }
 
@@ -320,20 +323,31 @@ class GameController:
         self.lose_streak = 0
 
     async def fetch_lottery_data(self, session: aiohttp.ClientSession) -> dict:
-        # 💡 [TRX] typeId 13 နှင့် Random, Signature အသစ်များ ထည့်သွင်းထားပါသည်
+        # 💡 [TRX] အစ်ကိုပေးထားသော Json Data အတိအကျကို ပြန်ထည့်ထားပါသည် (Timestamp အသေပါ)
         json_data = {
-            'pageSize': 10, 'pageNo': 1, 'typeId': 13, 'language': 7, 
+            'pageSize': 10, 
+            'pageNo': 1, 
+            'typeId': 13, 
+            'language': 7, 
             'random': '34e141e8512d411094dc208899ed0928', 
             'signature': '079FBAB8B7561999EF7C01920E15A126', 
-            'timestamp': int(time.time())
+            'timestamp': 1773625960
         }
         for _ in range(3):
             try:
-                async with session.post(Config.API_URL, headers=Config.HEADERS, json=json_data, timeout=3.0) as r:
-                    if r.status == 200: return await r.json()
-            except: await asyncio.sleep(0.5)
+                async with session.post(Config.API_URL, headers=Config.HEADERS, json=json_data, timeout=5.0) as r:
+                    if r.status == 200: 
+                        res = await r.json()
+                        if res.get('code') != 0:
+                            logger.error(f"⚠️ API Error (Code != 0): {res}")
+                        return res
+                    else:
+                        logger.error(f"⚠️ HTTP Error: {r.status}")
+            except Exception as e: 
+                logger.error(f"⚠️ Request Exception: {e}")
+                await asyncio.sleep(0.5)
         return None
-
+        
     async def run(self):
         await self.db.initialize()
         
