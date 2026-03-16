@@ -85,7 +85,7 @@ dp = Dispatcher()
 class DatabaseManager:
     def __init__(self, uri: str):
         self.client = motor.motor_asyncio.AsyncIOMotorClient(uri, serverSelectionTimeoutMS=5000)
-        self.db = self.client['bigwin4pattern_database']
+        self.db = self.client['ultra_ai_db']
         self.history = self.db['game_history']
         self.predictions = self.db['predictions']
 
